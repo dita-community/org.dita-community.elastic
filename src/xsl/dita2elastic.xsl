@@ -44,8 +44,14 @@
         <fn:string key="text">{normalize-space(.)}</fn:string>
       </fn:map>
     </xsl:variable>
+    
+    <!-- Every doc to be index needs an index command before it: -->
+    <xsl:text expand-text="false">{"index":{"_id":"</xsl:text>
+    <xsl:value-of select="generate-id(.)"/>
+    <xsl:text>"}}</xsl:text>
+    <xsl:text>&#x0a;</xsl:text>
+    
     <xsl:sequence select="fn:xml-to-json($jsonXml)"/>
-  
     <xsl:text>&#x0a;</xsl:text>
     <xsl:apply-templates select="*"/>
   </xsl:template>
