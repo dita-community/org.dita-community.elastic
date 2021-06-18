@@ -16,6 +16,9 @@
 
   <xsl:output method="text"/>
 
+  <xsl:param name="indexName" as="xs:string" select="'ditadocs'"/>
+  
+
   <xsl:template match="/" priority="10">
     <xsl:variable name="docid" as="xs:string" select="base-uri(.)"/>
     <xsl:variable name="resultData" as="item()*">
@@ -30,28 +33,41 @@
 
   <xsl:template match="*[@class]" as="item()*">
     <xsl:param name="docid" as="xs:string" tunnel="yes"/>
+
     <xsl:variable name="jsonXml" as="node()*">
       <fn:map>
         <fn:string key="docid">{$docid}</fn:string>
         <fn:string key="nodeid">{local:getNodeId(.)}</fn:string>
         <fn:string key="parent">{local:getNodeId(..)}</fn:string>
+        <fn:string key="parent_type">{local-name(..)}</fn:string>
+        <fn:string key="parent_class">{tokenize(../@class)}</fn:string>
         <fn:string key="tagname">{local-name(.)}</fn:string>
         <fn:string key="namespace">{namespace-uri(.)}</fn:string>
         <xsl:apply-templates mode="ditaClass" select="@class"/>
         <fn:map key="attributes">
           <xsl:apply-templates select="@*"/>
         </fn:map>
+        <fn:array key="children">
+          <xsl:apply-templates select="*" mode="childPointers"/>
+        </fn:array>        
+        <fn:array key="ancestor_types">
+          <xsl:apply-templates select="reverse(ancestor::*)" mode="ancestorTypes"/>
+        </fn:array>
+        <fn:array key="ancestor_classes">
+          <xsl:apply-templates select="reverse(ancestor::*)" mode="ancestorClasses"/>
+        </fn:array>
+        <fn:map key="props">
+          <xsl:apply-templates select="@*" mode="props"/>
+        </fn:map>
         <fn:string key="text">{normalize-space(.)}</fn:string>
       </fn:map>
     </xsl:variable>
-    
-    <!-- Every doc to be index needs an index command before it: -->
     <xsl:text expand-text="false">{"index":{"_id":"</xsl:text>
     <xsl:value-of select="generate-id(.)"/>
     <xsl:text>"}}</xsl:text>
     <xsl:text>&#x0a;</xsl:text>
-    
-    <xsl:sequence select="fn:xml-to-json($jsonXml)"/>
+
+    <xsl:sequence select="fn:xml-to-json($jsonXml)"/>  
     <xsl:text>&#x0a;</xsl:text>
     <xsl:apply-templates select="*"/>
   </xsl:template>
@@ -63,6 +79,24 @@
       </xsl:for-each>
     </fn:array>
   </xsl:template>
+
+  <xsl:template match="*" mode="childPointers">
+    <fn:string>{local:getNodeId(.)}</fn:string>
+  </xsl:template>
+
+  <xsl:template match="*" mode="ancestorTypes">
+    <fn:string>{local-name(.)}</fn:string>
+  </xsl:template>
+
+  <xsl:template match="*" mode="ancestorClasses">
+    <fn:string>{@class}</fn:string>
+  </xsl:template>
+
+  <xsl:template match="@*[local:isPropsAtt(.)]" mode="props">
+    <fn:string key="{name(.)}">{.}</fn:string>
+  </xsl:template>
+
+  <xsl:template match="@*" mode="props" priority="-1"/>
 
   <xsl:template match="@*">
     <fn:string key="{name(.)}">{.}</fn:string>
@@ -92,4 +126,16 @@
     <xsl:sequence select="$result"/>
   </xsl:function>
 
+  <xsl:function name="local:isPropsAtt" as="xs:boolean">
+    <xsl:param name="context" as="attribute()"/>
+
+    <xsl:variable name="result" as="xs:boolean"
+    select="
+      if (name($context) = ('props'))
+      then true()
+      else contains($context/root()/*/@specialization, '@props/' || name($context))
+    "
+    />
+    <xsl:sequence select="$result"/>
+  </xsl:function>
 </xsl:stylesheet>
